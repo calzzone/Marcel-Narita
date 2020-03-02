@@ -1,0 +1,1115 @@
+---
+title: "Lucrare de licență"
+subtitle: "Lucrare de licență"
+author: "Marcel Narita"
+output:
+  word_document:
+    fig_caption: yes
+    fig_height: 5
+    fig_width: 5
+    keep_md: no
+    toc: yes
+    reference_docx: word_template.docx
+  html_document:
+    df_print: kable
+    fig_caption: yes
+    fontface: Arial
+    fontsize: 11pt
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+    toc_float: no
+---
+
+https://rpubs.com/alex_istrate/n24c9fuoqrgb
+
+# Partea generală 
+
+
+
+# Partea specială 
+
+## Introducere
+
+### Obiective
+
+## Material și metode
+
+### Analiza statistică a datelor
+
+Pentru variabilele calitative, am folosit pie-uri sau bar-chart-uri și am calculat frecvențele absolute și relative ale categoriilor formate. Pentru a descrie relațiile dintre variabilele calitative am folosit testele Fisher și Odds-Ratio (OR) cu IC95% sau Chi² și Cramer V. Am prezentat grafic rezultatele sub forma unor bar-chart-uri.
+
+Am folosit Microsoft Excel 2016 pentru managementul bazei de date. Pentru toate analizele statistice și graficele ulterioare am folosit R 3.6.2 [1]. Am considerat p < 0.05 ca fiind semnificativ statistic și p < 0.1 ca prezentând doar o tendință spre semnificativitate statistică.
+
+```{r setup, echo=F, message=F, warning=F, results='hide'}
+library(ggplot2)
+#library(ggExtra) # ggMarginal()
+#library(cowplot) # plot_grid
+library(ggpubr)
+library(ggthemes)
+#library(ggcorrplot)
+#library(GGally) #ggpairs
+library(dplyr)
+library(readxl)
+library(grid)
+library(likert)
+
+library(pander)
+panderOptions('digits', 2)
+panderOptions('round', 2)
+panderOptions('keep.trailing.zeros', TRUE)
+options(scipen = 999)
+options(digits = 3)
+
+library(knitr)
+#library(formattable)
+library(kableExtra)
+#library(xtable)
+library(stargazer)
+library(finalfit)
+
+library(ggfortify)
+library(survival)
+
+library(Hmisc) #rcor
+#library(ppcor) # pcor.test (partial correlation)
+library(stringr)
+#library(mediation)
+#library(psych)
+library(DescTools)
+#library(vcd)
+#library(desctable)
+options(knitr.table.format = "pandoc")
+
+knitr::opts_chunk$set(comment = NA)
+
+library(captioner)
+fig_caption <- captioner::captioner("Figura")
+tab_caption <- captioner::captioner("Tabel")
+
+options(knitr.table.format = "pandoc")
+```
+
+```{r Source scripts, message=F, warning=F, echo=F, results='hide'}
+base_path = "~/Dropbox/Stats/"
+
+source(paste0(base_path, 'R library/search_for_variable.R'), echo=F)
+source(paste0(base_path, 'R library/mySSby.R'), echo=F)
+source(paste0(base_path, 'R library/mySSby3.R'), echo=F) # replace finalfit
+source(paste0(base_path, 'R library/describe_numerice1.R'), echo=F)
+source(paste0(base_path, 'R library/contingency.R'), echo=F)
+source(paste0(base_path, 'R library/describe2x2_v1.R'), echo=F)
+source(paste0(base_path, 'R library/mytheme.R'), echo=F)
+source(paste0(base_path, 'R library/assorted bits.R'), echo=F)
+source(paste0(base_path, 'R library/custom_charts.R'), echo=F)
+
+setwd(paste0(base_path, "2020/Marcel Narita"))
+```
+
+
+```{r Import data, echo=F, message=F, warning=F, fig.height=2.5, fig.width=6}
+metadata <- suppressWarnings(read_excel("Chestionar.xlsx", sheet = "metadata"))
+
+baza_de_date <- suppressWarnings(read_excel("Chestionar.xlsx", col_types = metadata$Type)) %>% 
+  #mutate(`Invaliditate/Grad` = str_remove_all(`Invaliditate/Grad`, "x")) %>%
+  labelled::set_variable_labels(.labels = metadata$Var) %>% 
+  mutate_at(metadata$ID[ #metadata$Type %in% c("text") & 
+    metadata$Role %in% c("danu" ,"binary", "factor", "ordered", "likert")], 
+    as.factor_metadata, metadata=metadata) %>% 
+  labelled::set_variable_labels(.labels = metadata$Label) %>%
+  #select(-c("ID", "Nume")) %>%
+  select(-c(metadata$Var[metadata$Role=="exclude"])) %>%
+  select(-c(metadata$Var[metadata$Role=="id"]))
+
+baza_de_date$`Alcool (cantitate)`[baza_de_date$`Alcool` == "nu"] <- "<50 ml"
+baza_de_date$`Alcool (cantitate)`[baza_de_date$`Alcool` == "da" & is.na(baza_de_date$`Alcool (cantitate)`)] <- "<50 ml"
+baza_de_date$`Alcool (cantitate)`[is.na(baza_de_date$`Alcool (cantitate)`)] <- "<50 ml"
+
+# baza_de_date$`Alcool (tip)`[is.na(baza_de_date$`Alcool (tip)`)] <- "nu consumă"
+# baza_de_date$`Alcool (tip)`[baza_de_date$`Alcool` == "da" & is.na(baza_de_date$`Alcool (tip)`)] <- "nu consumă"
+# baza_de_date$`Alcool (tip)`[baza_de_date$`Alcool` == "nu"] <- "nu consumă"
+# baza_de_date$`Alcool (tip)`[is.na(baza_de_date$`Alcool (tip)`)] <- "nu consumă"
+
+
+baza_de_date$`Alcool (tip)`[baza_de_date$`Alcool` == "nu"] <- NA
+# baza_de_date$`Alcool (cantitate)`[baza_de_date$`Alcool` == "nu"] <- NA
+
+baza_de_date$`Fumat (cantitate)`[is.na(baza_de_date$`Fumat (cantitate)`)] <- "0"
+
+
+
+# for (col in metadata$Var[metadata$Role=="numeric"]) {
+#   metadata <- update_var_metadata(DB = baza_de_date, metadata = metadata, var = col)
+# 
+#   #plot(my_histo(baza_de_date, col, NULL, metadata, F))
+# }
+
+metadata <- make_metadata(baza_de_date, existing.metadata = metadata)
+# write.csv(metadata, "metadata.csv", na = "")
+
+my.groups <- list()
+
+for (gr in unique(na.omit(metadata$Group))) {
+  my.groups[[gr]] <- make_groups_metadata(gr, metadata)
+}
+baza_de_date %<>% select(unlist(my.groups, use.names = F)) %>% droplevels()
+
+# for (gr in sort(names(my.groups))) {
+#   print(gr)
+#   print(summary(baza_de_date[my.groups[[gr]]]))
+# }
+# summary(baza_de_date, maxsum = 10)
+#DescTools::Desc(baza_de_date)
+
+# summary(my.groups)
+# my.groups
+
+# baza_de_date$`temp: Dispepsie neinvestigată`
+
+sums1 <- baza_de_date %>% select(c(my.groups$`Dispepsie neinvestigată`)[1:4]) %>%
+  mutate_all(function(x){-as.numeric(x)+2}) %>% rowSums()
+
+baza_de_date$`DG: Dispepsie neinvestigată` <- ifelse(
+  baza_de_date$`Dispepsie neinvestigată: debut > 6 luni` == "da" & sums1 >= 1, "da", "nu"
+) %>% factor(levels = c("da", "nu")) %>% set_label("Dispepsie neinvestigată")
+
+sums2 <- baza_de_date %>% select(c(my.groups$`Intestin iritabil`)[1:3]) %>%
+  mutate_all(function(x){-as.numeric(x)+2}) %>% rowSums()
+
+baza_de_date$`DG: Intestin iritabil` <- ifelse(
+  baza_de_date$`Intestin iritabil: debut > 6 luni` == "da" & sums2 >= 2, "da", "nu"
+) %>% factor(levels = c("da", "nu")) %>% set_label("Intestin iritabil")
+
+# summary(baza_de_date$`Accentuarea simptomelor la stres`)
+
+```
+
+## Rezulate
+
+### Demografie
+
+Din totalul de 106 răspunsuri, 80 (75.5%) au fost femei și 86 (81.1%) au fost între 22 și 25 ani.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.main","Demographic parameters of the sample."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c("Sex", "Varsta (ani)")) %>% 
+  make_summary_table(metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=NA)) 
+
+```
+
+```{r echo=F, fig.height=2.5, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+pie_sex <- my_pie(baza_de_date, "Sex", metadata = metadata) +  
+  scale_fill_brewer(metadata.var_to_labels("Sex", metadata), palette = "Set1")
+
+# pie_sex
+
+# pie_varsta <- my_pie(baza_de_date, "Varsta (ani)", metadata = metadata, lwd = 0.5, angle = 0.25, two.lines.labels = T) +  
+#   scale_fill_brewer(metadata.var_to_labels("Varsta (ani)", metadata), palette = "Dark2")
+
+bar_varsta <- my_bar(baza_de_date, "Varsta (ani)", metadata = metadata, flip = F) +  
+  scale_fill_brewer(metadata.var_to_labels("Varsta (ani)", metadata), palette = "Dark2")
+
+# pie_AG
+
+cowplot::plot_grid(pie_sex, bar_varsta, nrow=1)
+
+cat("\n\n")
+cat(fig_caption("pie.sex.var.age","Sex and age groups distribution."))
+cat("\n\n")
+```
+
+Distribuția pe grupe de vârstă a fost similară la cele 2 sexe (p=0.792).
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+my_bar(baza_de_date, var = "Varsta (ani)", facet = "Sex", metadata = metadata, flip = F) +  
+  scale_fill_brewer(metadata.var_to_labels("Sex", metadata), palette = "Set1")
+
+
+cat("\n\n")
+cat(fig_caption("histo_varsta.sex","Age distribution, by sex."))
+cat("\n\n")
+
+```
+
+### Accentuarea simptomelor la stres
+
+Majoritatea participanșilor au declarat accentuarea simptomelor la stres (n=65, 65.7%), fără o asociere cu sexul sau vârsta.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Accentuarea simptomelor la stres","Accentuarea simptomelor la stres, în funcție de sex și vârstă."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c("Sex", "Varsta (ani)", "Accentuarea simptomelor la stres")) %>% 
+  make_summary_table(metadata = metadata, dep = "Accentuarea simptomelor la stres",
+   header=list(lang="ro", columns = c("Factor", "Details", "Total", "Statistics")), 
+   footnote=list(lang="ro", values=c("OR", "V") )) 
+
+```
+
+```{r echo=F, fig.height=2.5, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+pie.acc <- baza_de_date %>% 
+  filter(!is.na(`Accentuarea simptomelor la stres`)) %>%
+  my_pie("Accentuarea simptomelor la stres", metadata = metadata) 
+
+bar.acc.sex <- baza_de_date %>% 
+  filter(!is.na(`Accentuarea simptomelor la stres`)) %>%
+  my_bar("Accentuarea simptomelor la stres", fill = "Sex", metadata = metadata, flip=F) +
+  scale_y_continuous("Cazuri", breaks=seq(0, 0.75, 0.25), limits=c(0, 1.2), labels=scales::percent_format(1))+
+  scale_fill_brewer(metadata.var_to_labels("Sex", metadata), palette = "Set1")
+# bar.acc.sex
+
+bar.acc.varsta <- baza_de_date %>% 
+  filter(!is.na(`Accentuarea simptomelor la stres`)) %>%
+  my_bar("Accentuarea simptomelor la stres", fill = "Varsta (ani)", metadata = metadata, flip=F) + 
+  scale_y_continuous("Cazuri", breaks=seq(0, 0.75, 0.25), limits=c(0, 1.2), labels=scales::percent_format(1))+ 
+  scale_fill_brewer(metadata.var_to_labels("Varsta (ani)", metadata), palette = "Dark2")
+# bar.acc.varsta
+
+cowplot::plot_grid(pie.acc, 
+                   bar.acc.varsta + no.title.x, 
+                   bar.acc.sex + no.labels.y + no.title.y + no.title.x,
+                   nrow = 1, rel_widths = c(2.2, 1.5, 1.0))
+
+cat("\n\n")
+cat(fig_caption("all.Accentuarea simptomelor la stres","Accentuarea simptomelor la stres, în funcție de sex și vârstă."))
+cat("\n\n")
+```
+
+### Dispepsie neinvestigată
+
+Conform citeriilor ROMA IV, 40 pacienți (37.7%) au prezentat dispepsie neinvestigată. În ultimele 3 luni, cei mai mulți pacientți au acuzat plenitudine postprandială supărătoare (n=55, 51.9%), arsură epigastrică supărătoare (n=44, 41.5%), durere epigastrică supărătoare (n=41, 38.7%), și doar 28 pacienți (26.4%) au acuzat sațietate precoce supărătoare. La 40 pacienți (37.7%), simptomele au debuat mai recent de 6 luni.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Dispepsie neinvestigată","Dispepsie neinvestigată."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Dispepsie neinvestigată`)) %>% 
+  make_summary_table(metadata = metadata, 
+   header=list(lang="ro", columns = c("Factor", "Total"),
+               labels = list(`Factor` = "Variabila*", `Total` = "N (%)")),
+   footnote=list(lang="ro", values=c("custom"), custom = c("* în ultimele 3 luni"))) 
+
+# în ultimele 3 luni
+# în ultimele 3 luni, în cel puțin 1 zi/ săptămână
+# durere abdominală recurentă asociată cu
+
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+my_bar_multivar(baza_de_date, vars=c(my.groups$`Dispepsie neinvestigată`), metadata = metadata, 
+                wrap.labels = 30, two.lines.labels = T) + 
+  scale_fill_viridis_c() 
+
+cat("\n\n")
+cat(fig_caption("f0.Dispepsie neinvestigată","Dispepsie neinvestigată."))
+cat("\n\n")
+```
+
+Dintre cei 41 pacienți care au acuzat durere epigastrică supărătoare (39%), 37 (90%) au fost femei, față de 43 (66%) dintre cei 65 pacienți care nu a acuzat durere epigastrică supărătoare. Rezultă că femeile au OR=4.7 [IC95% = 1.5 la 15.0] ori mai mare de a avea durere epigastrică supărătoare decât bărbații (phi=0.27, p=0.005 semnificativ statistic conform testului Fisher).
+
+Restul simptomelor nu s-au asciat semnificativ cu sexul.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Dispepsie neinvestigată.sex","Dispepsie neinvestigată, in functie de sex."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Dispepsie neinvestigată`, "Sex")) %>% 
+  make_summary_table(metadata = metadata, dep = "Sex",
+   header=list(lang="ro", columns = c("Factor", "Total", "Statistics"),
+               labels = list(`Factor` = "Variabila*", `Statistics` = "Teste statistice")), 
+   footnote=list(lang="ro", values=c("OR","custom"), 
+                 custom = c("\n* în ultimele 3 luni") )) 
+
+# describe2x2.or(baza_de_date, outcome = 'Durere epigastrică supărătoare', exposure = "Sex")
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+my_bar_multivar(baza_de_date, vars=c(my.groups$`Dispepsie neinvestigată`), metadata = metadata, 
+                facet = "Sex", 
+                wrap.labels = 20, two.lines.labels = T, axis.limit = 0.8, add.facet.name = T)
+
+cat("\n\n")
+cat(fig_caption("f0.Dispepsie neinvestigată.sex","Dispepsie neinvestigată, in functie de sex."))
+cat("\n\n")
+```
+
+În mod similar, vârsta s-a asociat semnficativ statistic cu acuzele de durere epigastrică supărătoare (la toți cei 4 pacienți de 18-21 ani, 36% dintre cei 86 pacienți de 22-25 ani și 37.5% dintre cei 16 pacienți de :25 aniș p=0.037).
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Dispepsie neinvestigată.varsta","Dispepsie neinvestigată, in functie de vârstă."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Dispepsie neinvestigată`, "Varsta (ani)")) %>% 
+  make_summary_table(metadata = metadata, dep = "Varsta (ani)",
+   header=list(lang="ro", columns = c("Factor", "Total", "Statistics"),
+               labels = list(`Factor` = "Variabila*", `Statistics` = "Teste statistice")), 
+   footnote=list(lang="ro", values=c("OR", "V","custom"), 
+                 custom = c("\n* în ultimele 3 luni") )) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+baza_de_date %>% filter(!is.na(`Varsta (ani)`)) %>%
+  my_bar_multivar2(vars=c(my.groups$`Dispepsie neinvestigată`), metadata = metadata,
+                   fill = "Varsta (ani)", 
+                wrap.labels = 20, two.lines.labels = T, axis.limit = 0.75, add.facet.name = T) +
+  legend.top_right+
+  scale_fill_brewer(metadata.var_to_labels("Varsta (ani)", metadata), palette = "Dark2")
+
+cat("\n\n")
+cat(fig_caption("f0.Dispepsie neinvestigată.varsta","Dispepsie neinvestigată, in functie de vârstă."))
+cat("\n\n")
+```
+
+Toate simptomele au fost statisitc mai probabile la pacienții care au declarat accentuarea simptomelor la stres.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Dispepsie neinvestigată.acc","Dispepsie neinvestigată, in functie de accentuarea simptomelor la stres."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Dispepsie neinvestigată`, "Accentuarea simptomelor la stres")) %>% 
+  make_summary_table(metadata = metadata, dep = "Accentuarea simptomelor la stres",
+   header=list(lang="ro", columns = c("Factor", "Total", "Statistics"),
+               labels = list(`Factor` = "Variabila*", `Statistics` = "Teste statistice")), 
+   footnote=list(lang="ro", values=c("OR","custom"), 
+                 custom = c("\n* în ultimele 3 luni") )) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+baza_de_date %>% filter(!is.na(`Accentuarea simptomelor la stres`)) %>%
+  # mutate_at("Accentuarea simptomelor la stres", forcats::fct_rev) %>%
+  my_bar_multivar2(vars=c(my.groups$`Dispepsie neinvestigată`), metadata = metadata,
+                   fill = "Accentuarea simptomelor la stres", 
+                wrap.labels = 20, two.lines.labels = T, axis.limit = 0.75, add.facet.name = T, sort.bars = "desc.count") +
+  legend.top_right + labs(fill=str_wrap(metadata.var_to_labels("Accentuarea simptomelor la stres", metadata), 10))
+
+cat("\n\n")
+cat(fig_caption("f0.Dispepsie neinvestigată.acc","Dispepsie neinvestigată, in functie de accentuarea simptomelor la stres."))
+cat("\n\n")
+```
+
+### Intestin iritabil
+
+Conform citeriilor ROMA IV, 14 pacienți (13.2%) au prezentat intestin iritabil. În ultimele 3 luni, în cel puțin 1 zi/ săptămână, cei mai mulți pacienți au acuzat durere abdominală recurentă asociată cu schimbarea frecvenței scaunului (n=36, 34.0%), schimbarea formei / aspectului scaunului (n=28, 26.4%), și doar la 26 pacienți (24.5%), cu defecația. La 23 pacienți (21.7%), simptomele au debuat mai recent de 6 luni.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Intestin iritabil","Intestin iritabil."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Intestin iritabil`)) %>% 
+  make_summary_table(metadata = metadata, 
+   header=list(lang="ro", columns = c("Factor", "Total"),
+               labels = list(`Factor` = "Durere abdominală recurentă asociată cu:", `Total` = "N (%)")),
+   footnote=list(lang="ro", values=c("custom"), custom = c("* în ultimele 3 luni, în cel puțin 1 zi/ săptămână"))) 
+
+# în ultimele 3 luni
+# în ultimele 3 luni, în cel puțin 1 zi/ săptămână
+# durere abdominală recurentă asociată cu
+
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+my_bar_multivar(baza_de_date, vars=c(my.groups$`Intestin iritabil`), metadata = metadata, 
+                wrap.labels = 30, two.lines.labels = T) + 
+  scale_fill_viridis_c() +
+  labs(title="Durere abdominală recurentă asociată cu:",
+       subtitle="* în ultimele 3 luni, în cel puțin 1 zi/ săptămână")
+  
+
+cat("\n\n")
+cat(fig_caption("f0.Intestin iritabil","Intestin iritabil."))
+cat("\n\n")
+```
+
+Sexul și vârsta nu s-au asociat semnificativ statisitc cu niciunul dintre criteriile intestinului iritablil.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Intestin iritabil.sex","Intestin iritabil, in functie de sex."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Intestin iritabil`, "Sex")) %>% 
+  make_summary_table(metadata = metadata, dep = "Sex",
+   header=list(lang="ro", columns = c("Factor", "Total", "Statistics"),
+               labels = list(`Factor` = "Durere abdominală recurentă asociată cu:", `Statistics` = "Teste statistice")), 
+   footnote=list(lang="ro", values=c("OR","custom"), 
+                 custom = c("\n* în ultimele 3 luni, în cel puțin 1 zi/ săptămână") )) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+my_bar_multivar(baza_de_date, vars=c(my.groups$`Intestin iritabil`), metadata = metadata, 
+                facet = "Sex", 
+                wrap.labels = 20, two.lines.labels = T, axis.limit = 0.55, add.facet.name = T)+
+  labs(title="Durere abdominală recurentă asociată cu:",
+       subtitle="* în ultimele 3 luni, în cel puțin 1 zi/ săptămână") +
+
+cat("\n\n")
+cat(fig_caption("f0.Intestin iritabil.sex","Intestin iritabil, in functie de sex."))
+cat("\n\n")
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Intestin iritabil.varsta","Intestin iritabil, in functie de vârstă."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Intestin iritabil`, "Varsta (ani)")) %>% 
+  make_summary_table(metadata = metadata, dep = "Varsta (ani)",
+   header=list(lang="ro", columns = c("Factor", "Total", "Statistics"),
+               labels = list(`Factor` = "Durere abdominală recurentă asociată cu:", `Statistics` = "Teste statistice")), 
+   footnote=list(lang="ro", values=c("V","custom"), 
+                 custom = c("\n* în ultimele 3 luni, în cel puțin 1 zi/ săptămână") )) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+baza_de_date %>% filter(!is.na(`Varsta (ani)`)) %>%
+  my_bar_multivar2(vars=c(my.groups$`Intestin iritabil`), metadata = metadata,
+                   fill = "Varsta (ani)", 
+                wrap.labels = 20, two.lines.labels = T, axis.limit = 0.4, add.facet.name = T) +
+  legend.top_right +
+  labs(title="Durere abdominală recurentă asociată cu:",
+       subtitle="* în ultimele 3 luni, în cel puțin 1 zi/ săptămână") +
+  scale_fill_brewer(metadata.var_to_labels("Varsta (ani)", metadata), palette = "Dark2")
+
+cat("\n\n")
+cat(fig_caption("f0.Intestin iritabil.varsta","Intestin iritabil, in functie de vârstă."))
+cat("\n\n")
+
+# describe2x2.or(baza_de_date, outcome = 'DG: Intestin iritabil', exposure = "Accentuarea simptomelor la stres")
+```
+
+Dintre cei 13 pacienți cu DG: Intestin iritabil (13%), 11 (85%) au acuzat accentuarea simptomelor la stres, față de 54 (63%) dintre cei 86 pacienți fără DG de intestin iritabil. Rezultă că pacienții cu DG de Intestin iritabil au OR=3.3 [IC95% = 0.7 la 15.6 ] ori mai mare de a acuza accentuarea simptomelor la stres decât cei făă (phi=0.16, p=0.122 nesemnificativ statistic conform testului Chi²).
+
+Totuși, toate cele 3 simptome și debutul simptmelor mai recent de 6 luni au fost semnificativ asociate cu o creștere a probabilității de a acuza accentuarea simptomelor la stres.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Intestin iritabil.acc","Intestin iritabil, in functie de accentuarea simptomelor la stres."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Intestin iritabil`, "Accentuarea simptomelor la stres")) %>% 
+  make_summary_table(metadata = metadata, dep = "Accentuarea simptomelor la stres",
+   header=list(lang="ro", columns = c("Factor", "Total", "Statistics"),
+               labels = list(`Factor` = "Durere abdominală recurentă asociată cu:", `Statistics` = "Teste statistice")), 
+   footnote=list(lang="ro", values=c("OR","custom"), 
+                 custom = c("\n* în ultimele 3 luni, în cel puțin 1 zi/ săptămână") )) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+baza_de_date %>% filter(!is.na(`Accentuarea simptomelor la stres`)) %>%
+  # mutate_at("Accentuarea simptomelor la stres", forcats::fct_rev) %>%
+  my_bar_multivar2(vars=c(my.groups$`Intestin iritabil`), metadata = metadata,
+                   fill = "Accentuarea simptomelor la stres", 
+                wrap.labels = 20, two.lines.labels = T, axis.limit = 0.4, add.facet.name = T, sort.bars = "desc.count") +
+  labs(title="Durere abdominală recurentă asociată cu:",
+       subtitle="* în ultimele 3 luni, în cel puțin 1 zi/ săptămână") +
+  legend.top_right + labs(fill=str_wrap(metadata.var_to_labels("Accentuarea simptomelor la stres", metadata), 10))
+
+cat("\n\n")
+cat(fig_caption("f0.Intestin iritabil.acc","Intestin iritabil, in functie de accentuarea simptomelor la stres."))
+cat("\n\n")
+```
+
+### Factori de risc
+
+Majoritatea pacienților au fost normoponderali (79.2%), câte 10 (9.4%) au fost sub- sau supra-ponderali si doar 2 pacienți au avut IMC > 30 kg/m².
+
+Doar 21.7% dinte partcipanți au decarat că nu consumă cafea, iar majoritatea paciențior au declarat consumnul de câte 1 (38.7%) sau 2 (30.2%) cești / zi.
+
+Aproximativ 26.4% dinte pacienți au declarat consumul alimente bogate ăn grăsimi mai frecvent de 3 ori / săptămână.
+
+Doar 10.4% dintre pacienți au declarat că utilizează AINS mai des de 6 ori / lună.
+
+Aproximativ 91.2%% dinte pacienți au acuzat stres mai crescut în timpul anului universitar.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.FR","Sumarizarea factorilor de risc."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Factori de risc`)) %>% 
+  make_summary_table(metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=NA)) 
+
+
+```
+
+Niciunul dintre factorii de risc de mai sus nu s-a asociat semnificativ statistic cu accentuarea simptomelor la stres, DG de Intestin iritabil sau DG de Dispepsie neinvestigată.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.FR.acc","Sumarizarea factorilor de risc, în funcție de Accentuarea simptomelor la stres."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Factori de risc`, "Accentuarea simptomelor la stres")) %>% 
+  make_summary_table("Accentuarea simptomelor la stres", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.FR.Intestin iritabil","Sumarizarea factorilor de risc, în funcție de DG: Intestin iritabil."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Factori de risc`, "DG: Intestin iritabil")) %>% 
+  make_summary_table("DG: Intestin iritabil", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.FR.Dispepsie neinvestigată","Sumarizarea factorilor de risc, în funcție de Dispepsie neinvestigată."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Factori de risc`, "DG: Dispepsie neinvestigată")) %>% 
+  make_summary_table("DG: Dispepsie neinvestigată", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=2.5, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+my_bar(baza_de_date, var = "IMC", facet = "Sex", metadata = metadata, flip = T, lwd=0.1) +  
+  scale_fill_brewer(metadata.var_to_labels("Sex", metadata), palette = "Spectral", direction=-1) +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+my_bar(baza_de_date, var = "IMC", facet = "Accentuarea simptomelor la stres", metadata = metadata, flip = T, lwd=0.1) +  
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+my_bar(baza_de_date, var = "IMC", facet = "DG: Intestin iritabil", metadata = metadata, flip = T, lwd=0.1) +  
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+my_bar(baza_de_date, var = "IMC", facet = "DG: Dispepsie neinvestigată", metadata = metadata, flip = T, lwd=0.1) +  
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+cat("\n\n")
+cat(fig_caption("f.imc","Distribuția IMC."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=4, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+FR1 <- my_bar(baza_de_date, var = "Cafea", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = T, wrap.title = 25, stack.reverse = T) + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.1), limits=c(0, 0.5), labels=scales::percent_format(1))
+
+FR2 <- my_bar(baza_de_date, var = "Alimente bogate în grăsimi", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = T, wrap.title = 25, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.1), limits=c(0, 0.5), labels=scales::percent_format(1))
+
+FR3 <- my_bar(baza_de_date, var = "AINS", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = T, wrap.title = 20, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+FR4 <- my_bar(baza_de_date, var = "Stres universitar", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = T, wrap.title = 20, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(FR1 + legend.top + scale_fill_discrete("Accentuarea simptomelor la stres")), 
+                   cowplot::plot_grid(FR1, FR2, FR3, FR4, rel_heights = c(8, 5), align = "hv", axis = "tblr"),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.FR.Accentuarea simptomelor la stres","Sumarizarea factorilor de risc, în funcție de Accentuarea simptomelor la stres."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=4, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+FR1 <- my_bar(baza_de_date, var = "Cafea", fill = "DG: Intestin iritabil", metadata = metadata, flip = T, wrap.title = 25, stack.reverse = T) + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.1), limits=c(0, 0.5), labels=scales::percent_format(1))
+
+FR2 <- my_bar(baza_de_date, var = "Alimente bogate în grăsimi", fill = "DG: Intestin iritabil", metadata = metadata, flip = T, wrap.title = 25, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.1), limits=c(0, 0.5), labels=scales::percent_format(1))
+
+FR3 <- my_bar(baza_de_date, var = "AINS", fill = "DG: Intestin iritabil", metadata = metadata, flip = T, wrap.title = 20, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+FR4 <- my_bar(baza_de_date, var = "Stres universitar", fill = "DG: Intestin iritabil", metadata = metadata, flip = T, wrap.title = 20, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(FR1 + legend.top + scale_fill_discrete("DG: Intestin iritabil")), 
+                   cowplot::plot_grid(FR1, FR2, FR3, FR4, rel_heights = c(8, 5), align = "hv", axis = "tblr"),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.FR.Intestin iritabil","Sumarizarea factorilor de risc, în funcție de intestin iritabil."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=4, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+FR1 <- my_bar(baza_de_date, var = "Cafea", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = T, wrap.title = 25, stack.reverse = T) + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.1), limits=c(0, 0.5), labels=scales::percent_format(1))
+
+FR2 <- my_bar(baza_de_date, var = "Alimente bogate în grăsimi", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = T, wrap.title = 25, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.1), limits=c(0, 0.5), labels=scales::percent_format(1))
+
+FR3 <- my_bar(baza_de_date, var = "AINS", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = T, wrap.title = 20, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+FR4 <- my_bar(baza_de_date, var = "Stres universitar", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = T, wrap.title = 20, stack.reverse = T)  + 
+  no_legend +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 1.1), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(FR1 + legend.top + scale_fill_discrete("DG: Dispepsie neinvestigată")), 
+                   cowplot::plot_grid(FR1, FR2, FR3, FR4, rel_heights = c(8, 5), align = "hv", axis = "tblr"),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.FR.Dispepsie neinvestigată","Sumarizarea factorilor de risc, în funcție de dispepsie neinvestigată."))
+cat("\n\n")
+
+```
+
+### Alcool
+	
+68 pariticipanți (64.2%) au declarat consumul de băuturi alcoolice. În ceea ce privește cantitatea, majoritatea (60.4%) au decratat consumul de 0-50 ml / săptămână. Cei mau mulți participanți au declarat că preferă vinul (56.7%). Consumul de alcool nu s-a asociat semnificativ statisitc cu accentuarea simptomelor la stres, DG de Intestin iritabil sau DG de Dispepsie neinvestigată.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Alcool","Sumarizarea consumului de alcool."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Alcool`)) %>% droplevels() %>%
+  make_summary_table(metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=NA)) 
+
+# levels(baza_de_date$`Accentuarea simptomelor la stres`)
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Alcool.acc","Sumarizarea consumului de alcool, în funcție de Accentuarea simptomelor la stres."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Alcool`, "Accentuarea simptomelor la stres")) %>% 
+   droplevels() %>%
+  make_summary_table("Accentuarea simptomelor la stres", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Alcool.Intestin iritabil","Sumarizarea consumului de alcool, în funcție de Intestin iritabil."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Alcool`, "DG: Intestin iritabil")) %>%  droplevels() %>%
+  make_summary_table("DG: Intestin iritabil", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Alcool.Dispepsie neinvestigată","Sumarizarea consumului de alcool, în funcție de Dispepsie neinvestigată."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Alcool`, "DG: Dispepsie neinvestigată")) %>%  droplevels() %>%
+  make_summary_table("DG: Dispepsie neinvestigată", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+Alcool1 <- my_bar(baza_de_date, var = "Alcool", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T, ) + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+Alcool2 <- my_bar(baza_de_date, var = "Alcool (cantitate)", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+Alcool3 <- my_bar(baza_de_date, var = "Alcool (tip)", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = F, wrap.title = 20, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(Alcool1 + legend.top + scale_fill_discrete("Accentuarea simptomelor la stres")), 
+                   cowplot::plot_grid(Alcool1, Alcool2, Alcool3, align = "hv", axis = "tblr", nrow=1, rel_widths = c(5, 7, 6)),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.Alcool.Accentuarea simptomelor la stres","Sumarizarea consumului de alcool, în funcție de Accentuarea simptomelor la stres."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+Alcool1 <- my_bar(baza_de_date, var = "Alcool", fill = "DG: Intestin iritabil", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T, ) + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+Alcool2 <- my_bar(baza_de_date, var = "Alcool (cantitate)", fill = "DG: Intestin iritabil", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+Alcool3 <- my_bar(baza_de_date, var = "Alcool (tip)", fill = "DG: Intestin iritabil", metadata = metadata, flip = F, wrap.title = 20, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(Alcool1 + legend.top + scale_fill_discrete("DG: Intestin iritabil")), 
+                   cowplot::plot_grid(Alcool1, Alcool2, Alcool3, align = "hv", axis = "tblr", nrow=1, rel_widths = c(5, 7, 6)),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.Alcool.Intestin iritabil","Sumarizarea consumului de alcool, în funcție de Intestin iritabil."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+Alcool1 <- my_bar(baza_de_date, var = "Alcool", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T, ) + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+Alcool2 <- my_bar(baza_de_date, var = "Alcool (cantitate)", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+Alcool3 <- my_bar(baza_de_date, var = "Alcool (tip)", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = F, wrap.title = 20, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.75), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(Alcool1 + legend.top + scale_fill_discrete("DG: Dispepsie neinvestigată")), 
+                   cowplot::plot_grid(Alcool1, Alcool2, Alcool3, align = "hv", axis = "tblr", nrow=1, rel_widths = c(5, 7, 6)),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.Alcool.DG: Dispepsie neinvestigată","Sumarizarea consumului de alcool, în funcție de DG: Dispepsie neinvestigată."))
+cat("\n\n")
+
+```
+
+### Fumat
+
+34 pariticipanți (32.1%) s-au declarat fumători, dintre care câte 14 pacienți au declarat 1-5 țigări/zi sau 6-10 țigări/zi. Consumul de tutun nu s-a asociat semnificativ statisitc cu accentuarea simptomelor la stres, DG de Intestin iritabil sau DG de Dispepsie neinvestigată.
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Fumat","Sumarizarea consumului de tutun."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Fumat`)) %>% 
+  make_summary_table(metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=NA)) 
+
+# levels(baza_de_date$`Accentuarea simptomelor la stres`)
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Fumat.Accentuarea simptomelor la stres","Sumarizarea consumului de tutun, în funcție de Accentuarea simptomelor la stres."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Fumat`, "Accentuarea simptomelor la stres")) %>% 
+  make_summary_table("Accentuarea simptomelor la stres", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Fumat.Intestin iritabil","Sumarizarea consumului de tutun, în funcție de Intestin iritabil."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Fumat`, "DG: Intestin iritabil")) %>% 
+  make_summary_table("DG: Intestin iritabil", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+cat("\n\n")
+cat(tab_caption("t0.Fumat.Dispepsie neinvestigată","Sumarizarea consumului de tutun, în funcție de Dispepsie neinvestigată."))
+cat("\n\n")
+
+baza_de_date %>% 
+  select(c(my.groups$`Fumat`, "DG: Dispepsie neinvestigată")) %>% 
+  make_summary_table("DG: Dispepsie neinvestigată", metadata = metadata, 
+   header=list(lang="ro"), footnote=list(lang="ro", values=c("V", "OR"))) 
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+Fumat1 <- my_bar(baza_de_date, var = "Fumat", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T, ) + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 0.8), labels=scales::percent_format(1))
+
+Fumat2 <- my_bar(baza_de_date, var = "Fumat (cantitate)", fill = "Accentuarea simptomelor la stres", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.8), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(Fumat1 + legend.top + scale_fill_discrete("Accentuarea simptomelor la stres")), 
+                   cowplot::plot_grid(Fumat1, Fumat2, align = "hv", axis = "tblr", nrow=1, rel_widths = c(3, 6)),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.Fumat.Accentuarea simptomelor la stres","Sumarizarea consumului de tutun, în funcție de Accentuarea simptomelor la stres."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+Fumat1 <- my_bar(baza_de_date, var = "Fumat", fill = "DG: Intestin iritabil", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T, ) + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 0.8), labels=scales::percent_format(1))
+
+Fumat2 <- my_bar(baza_de_date, var = "Fumat (cantitate)", fill = "DG: Intestin iritabil", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.8), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(Fumat1 + legend.top + scale_fill_discrete("DG: Intestin iritabil")), 
+                   cowplot::plot_grid(Fumat1, Fumat2, align = "hv", axis = "tblr", nrow=1, rel_widths = c(3, 6)),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.Fumat.DG: Intestin iritabil","Sumarizarea consumului de tutun, în funcție de DG: Intestin iritabil."))
+cat("\n\n")
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+Fumat1 <- my_bar(baza_de_date, var = "Fumat", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T, ) + 
+  no_legend +
+  scale_y_continuous("Cazuri", breaks=seq(0, 1, 0.25), limits=c(0, 0.8), labels=scales::percent_format(1))
+
+Fumat2 <- my_bar(baza_de_date, var = "Fumat (cantitate)", fill = "DG: Dispepsie neinvestigată", metadata = metadata, flip = F, wrap.title = 25, stack.reverse = T)  + 
+  no_legend + perpendicular.labels.x +
+  scale_y_continuous("", breaks=seq(0, 1, 0.25), limits=c(0, 0.8), labels=scales::percent_format(1))
+
+cowplot::plot_grid(cowplot::get_legend(Fumat1 + legend.top + scale_fill_discrete("DG: Dispepsie neinvestigată")), 
+                   cowplot::plot_grid(Fumat1, Fumat2, align = "hv", axis = "tblr", nrow=1, rel_widths = c(3, 6)),
+                   nrow = 2, rel_heights = c(1, 8))
+
+cat("\n\n")
+cat(fig_caption("f1.Fumat.DG: Dispepsie neinvestigată","Sumarizarea consumului de tutun, în funcție de DG: Dispepsie neinvestigată."))
+cat("\n\n")
+
+```
+
+## Regs
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=F}
+
+# Cafea
+
+baza_de_date %>% mutate_all(forcats::fct_explicit_na) %>%
+  select(c("DG: Intestin iritabil", 
+           my.groups$Demografie, 
+           my.groups$`Factori de risc`, 
+           my.groups$Alcool, 
+           my.groups$Fumat)) %>%
+  mutate_all(as.numeric) %>%
+  mutate_at("DG: Intestin iritabil", as.factor) %>%
+  # rename(`II` = `DG: Intestin iritabil`) %>%
+  # set_colnames(make.names(colnames(.))) %>%
+  # glm(formula=`II`~., family = binomial()) %>% 
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) %>%
+  # step(trace=F) %>%
+  sjPlot::tab_model()
+
+# none
+
+baza_de_date %>% mutate_all(forcats::fct_explicit_na) %>%
+  select(c("DG: Dispepsie neinvestigată", 
+           my.groups$Demografie, 
+           my.groups$`Factori de risc`, 
+           my.groups$Alcool, 
+           my.groups$Fumat)) %>%
+  mutate_all(as.numeric) %>%
+  mutate_at("DG: Dispepsie neinvestigată", as.factor) %>%
+  # rename(`DN` = `DG: Intestin iritabil`) %>%
+  # set_colnames(make.names(colnames(.))) %>%
+  # glm(formula=`DN`~., family = binomial()) %>% 
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) %>%
+  # step(trace=F) %>%
+  sjPlot::tab_model()
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=F}
+set1.bin <- c("Cafea", "Alcool", "Fumat", "Accentuarea simptomelor la stres", "Alimente bogate în grăsimi")
+set1.num <- c("Cafea", "Alcool (cantitate)", "Fumat (cantitate)", "Accentuarea simptomelor la stres", "Alimente bogate în grăsimi")
+
+m1.bin.ii <- baza_de_date %>% select(c("DG: Intestin iritabil", set1.bin)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m1.num.ii <- baza_de_date %>% select(c("DG: Intestin iritabil", set1.num)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) # %>% sjPlot::tab_model()
+
+m1.bin.dn <- baza_de_date %>% select(c("DG: Dispepsie neinvestigată", set1.bin)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m1.num.dn <- baza_de_date %>% select(c("DG: Dispepsie neinvestigată", set1.num)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) #%>% sjPlot::tab_model()
+
+set2.bin <- c("Cafea", "Alcool", "Fumat", "Accentuarea simptomelor la stres", "Sex")
+set2.num <- c("Cafea", "Alcool (cantitate)", "Fumat (cantitate)", "Accentuarea simptomelor la stres", "Sex")
+
+m2.bin.ii <- baza_de_date %>% select(c("DG: Intestin iritabil", set2.bin)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m2.num.ii <- baza_de_date %>% select(c("DG: Intestin iritabil", set2.num)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m2.bin.dn <- baza_de_date %>% select(c("DG: Dispepsie neinvestigată", set2.bin)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m2.num.dn <- baza_de_date %>% select(c("DG: Dispepsie neinvestigată", set2.num)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) #%>% sjPlot::tab_model()
+
+set3.bin <- c("Cafea", "Alcool", "Fumat", "Accentuarea simptomelor la stres", "Alimente bogate în grăsimi", "Sex")
+set3.num <- c("Cafea", "Alcool (cantitate)", "Fumat (cantitate)", "Accentuarea simptomelor la stres", "Alimente bogate în grăsimi", "Sex")
+
+m3.bin.ii <- baza_de_date %>% select(c("DG: Intestin iritabil", set3.bin)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m3.num.ii <- baza_de_date %>% select(c("DG: Intestin iritabil", set3.num)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Intestin iritabil`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m3.bin.dn <- baza_de_date %>% select(c("DG: Dispepsie neinvestigată", set3.bin)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) #%>% sjPlot::tab_model()
+
+m3.num.dn <- baza_de_date %>% select(c("DG: Dispepsie neinvestigată", set3.num)) %>%
+  mutate_if(is.binary, forcats::fct_rev) %>%
+  mutate_if(is.categ, as.numeric) %>%
+  glm(formula=`DG: Dispepsie neinvestigată`~., family = binomial()) #%>% sjPlot::tab_model()
+
+
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=F}
+
+sjPlot::tab_model(m1.bin.dn, m1.num.dn, m2.bin.dn, m2.num.dn, 
+                  # dv.labels = c("Set1"),
+                  collapse.ci = T)
+
+sjPlot::plot_models(m1.bin.dn, m1.num.dn, m2.bin.dn, m2.num.dn)
+
+
+```
+
+```{r echo=F, fig.height=3, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=F}
+
+sjPlot::tab_model(m1.bin.ii, m1.num.ii, m2.bin.ii, m2.num.ii, 
+                  # dv.labels = c("Set1"),
+                  collapse.ci = T)
+
+sjPlot::plot_models(m1.bin.ii, m1.num.ii, m2.bin.ii, m2.num.ii)
+
+
+```
+
+```{r echo=F, fig.height=5, fig.width=5, message=F, warning=F, dpi=144, results="asis", include=T}
+
+sjPlot::tab_model(m3.bin.dn, m3.num.dn, #m3.bin.ii, m3.num.ii, 
+                  # dv.labels = c("Set1"),
+                  collapse.ci = T, file="model3.1.html")
+
+sjPlot::tab_model(#m3.bin.dn, m3.num.dn, 
+                  m3.bin.ii, m3.num.ii, 
+                  # dv.labels = c("Set1"),
+                  collapse.ci = T, file="model3.2.html")
+
+sjPlot::plot_models(m3.bin.dn, m3.num.dn, m3.bin.ii, m3.num.ii,
+                    m.labels = c("Dispepsie neinvestigată\n(binar)", "Dispepsie neinvestigată\n(cantitativ)", 
+                                 "Intestin iritabil\n(binar)", "Intestin iritabil\n(cantitativ)"),
+                    prefix.labels = "label", spacing = 0.67, legend.title = "", p.shape = T, dot.size = 2) +
+  # legend.bottom_left +
+  legend.top + guides(color=guide_legend(nrow = 2, keyheight = unit(25, "pt"), keywidth = unit(15, "pt"), reverse = T), shape=F) + 
+  # scale_color_brewer(palette = "Paired") +
+  scale_color_manual(values = c("#43b3ae", "#195a40", "#f2545b", "#820263"))+
+  scale_shape_manual(values=c(1, 19, 19, 19)) +
+  scale_y_log10(limits=c(1/8, 64), breaks=2^seq(-5, 6), 
+                labels=c(#"1/" %+% 2^seq(5, 4), "⅛", "¼", "½",
+                         "1/" %+% 2^seq(5, 1), 
+                         "➊",
+                         2^seq(1, 6)))
+
+
+```
+
+# References
+
+1. R Core Team (2020). R: A language and environment for statistical computing. R Foundation for Statistical Computing, Vienna, Austria. URL https://www.R-project.org/.
+
